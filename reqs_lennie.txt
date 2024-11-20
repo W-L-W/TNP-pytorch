@@ -1,0 +1,3 @@
+# simplified list of requirements for pip venv
+torch
+attrdict

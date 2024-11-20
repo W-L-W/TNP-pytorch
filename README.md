@@ -1,40 +1,46 @@
-# Transformer Neural Processes: Uncertainty-Aware Meta Learning Via Sequence Modeling
+## 1D Regression
 
-This is the official implementation of the paper [Transformer Neural Processes: Uncertainty-Aware Meta Learning Via Sequence Modeling](https://arxiv.org/abs/2207.04179) in Pytorch. We propose Transformer Neural Processes (TNPs), a new member of the Neural Processes family that casts uncertainty-aware meta learning as a sequence modeling problem. We learn TNPs via an autoregressive likelihood-based objective and instantiate it with a novel transformer-based architecture. TNPs achieve state-ofthe-art performance on various benchmark problems, outperforming all previous NP variants on meta regression, image completion, contextual multi-armed bandits, and Bayesian optimization.
-
-<img width="100%" src="./tnp.png">
-
-## Install
-
-First, clone the repository:
-
+---
+### Training
 ```
-git clone https://github.com/tung-nd/TNP-pytorch.git
+python gp.py --mode=train --expid=default-tnpa --model=tnpa
 ```
+The config of hyperparameters of each model is saved in `configs/gp`. If training for the first time, evaluation data will be generated and saved in `evalsets/gp`. Model weights and logs are saved in `results/gp/{model}/{expid}`.
 
-Then install the dependencies as listed in `env.yml` and activate the environment:
-
+### Evaluation
 ```
-conda env create -f env.yml
-conda activate tnp
+python gp.py --mode=evaluate_all_metrics --expid=default-tnpa --model=tnpa
 ```
+Note that you have to specify `{expid}` correctly. The model will load weights from `results/gp/{model}/{expid}` to evaluate.
 
-## Usage
+## CelebA Image Completion
+---
 
-Please check the directory of each task for specific usage.
+### Prepare data
+Download [img_align_celeba.zip](https://drive.google.com/drive/folders/0B7EVK8r0v71pTUZsaXdaSnZBZzg) and unzip. Download [list_eval_partitions.txt](https://drive.google.com/drive/folders/0B7EVK8r0v71pdjI3dmwtNm5jRkE) and [identity_CelebA.txt](https://drive.google.com/drive/folders/0B7EVK8r0v71pOC0wOVZlQnFfaGs). Place downloaded files in `datasets/celeba` folder. Run `python data/celeba.py` to preprocess the data.
 
-## Citation
-
-If you find this repo useful in your research, please consider citing our paper:
+### Training
 ```
-@article{nguyen2022transformer,
-  title={Transformer neural processes: Uncertainty-aware meta learning via sequence modeling},
-  author={Nguyen, Tung and Grover, Aditya},
-  journal={arXiv preprint arXiv:2207.04179},
-  year={2022}
-}
+python celeba.py --mode=train --expid=default-tnpa --model=tnpa
 ```
 
-## Acknowledgement
+### Evaluation
+```
+python celeba.py --mode=evaluate_all_metrics --expid=default-tnpa --model=tnpa
+```
+If evaluating for the first time, evaluation data will be generated and saved in `evalsets/celeba`.
 
-The implementation of the baselines is borrowed from the official code base of [Bootstrapping Neural Processes](https://github.com/juho-lee/bnp).
+## EMNIST Image Completion
+---
+
+### Training
+```
+python emnist.py --mode=train --expid=default-tnpa --model=tnpa
+```
+If training for the first time, EMNIST training data will automatically downloaded and saved in `datasets/emnist`.
+
+### Evaluation
+```
+python emnist.py --mode=evaluate_all_metrics --expid=default-tnpa --model=tnpa
+```
+If evaluating for the first time, evaluation data will be generated and saved in `evalsets/emnist`.
