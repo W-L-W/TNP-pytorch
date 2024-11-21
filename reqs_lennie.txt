@@ -1,3 +1,8 @@
 # simplified list of requirements for pip venv
+# note attrdict was broken so I removed this as req.
 torch
-attrdict
+pyyaml
+numpy
+uncertainty_toolbox
+tqdm
+ipykernel

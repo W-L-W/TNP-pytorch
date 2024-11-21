@@ -34,3 +34,96 @@ def hrminsec(duration):
     hours, left = duration // 3600, duration % 3600
     mins, secs = left // 60, left % 60
     return f"{hours}hrs {mins}mins {secs}secs"
+
+
+# Lennie
+class AttrDict:
+    """Lightweight implementation of attribute dictionary (by Lennie).
+    Class only supports attribute access and setting.
+    However it has a dictionary property for when one wants a plain dictionary interface.
+    """
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+        
+    @property
+    def dictionary(self):
+        return self.__dict__
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}({str(self.dictionary)}'
+
+    def items(self):
+        return self.dictionary.items()
+
+    def save_torch(self, f):
+        """Save attr dict to torch file."""
+        torch.save(self.dictionary, f)
+
+    @classmethod
+    def load_torch(cls, f, map_location=None, *, weights_only=True, mmap=None, **pickle_load_args):
+        """Load attr dict from torch file."""
+        torch_dict = torch.load(f, map_location=map_location, weights_only=weights_only, mmap=mmap, **pickle_load_args)
+        return cls.__init__(**torch_dict)
+
+
+
+
+from collections import UserDict
+
+# class AttrDict(UserDict):
+#     """Work around suggested at https://stackoverflow.com/questions/72361026/how-can-i-get-attrdict-module-working-in-python
+#     (not confident this is full replacement)"""
+#     def __getattr__(self, key):
+#         return self.__getitem__(key)
+#     def __setattr__(self, key, value):
+#         if key == "data":
+#             return super().__setattr__(key, value)
+#         return self.__setitem__(key, value)
+
+
+# class AttrDict(dict):
+    # '''Class that is like a dictionary with items usable like attributes.
+    # From https://python-forum.io/thread-15082.html 
+    # #---------------------------------------------------------------
+    # # purpose       class that is a dictionary with items usable
+    # #               like attributes
+    # #
+    # # init usage    object = attrdict(dictionary)
+    # #               object = attrdict(dictionary,key=value...)
+    # #               object = attrdict(key=value...)
+    # #
+    # # attr usage    object.name
+    # #
+    # # dict usage    object[key]
+    # #
+    # # note          attribute usage is like string keys that are
+    # #               limited to what can be a valid identifier.
+    # #
+    # # thanks        nilamo@python-forum.io
+    # #---------------------------------------------------------------
+    # '''
+    # def __init__(self,*args,**opts):
+    #     arn = 0
+    #     for arg in args:
+    #         arn += 1
+    #         if isinstance(arg,(attrdict,dict)):
+    #             self.update(arg)
+    #         elif arg and isinstance(arg,(list,tuple)):
+    #             an = -1
+    #             for ar in arg:
+    #                 an += 1
+    #                 if isinstance(ar,(list,tuple)) and len(ar)==2:
+    #                     self[ar[0]] = ar[1]
+    #                 else:
+    #                     raise TypeError('not a 2-sequence at ['+str(an)+'] of argument '+str(arn))
+    #         else:
+    #             raise TypeError('argument '+str(arn)+' is not a sequence')
+    #     if opts:
+    #         if isinstance(opts,(attrdict,dict)):
+    #             self.update(opts)
+    #         else:
+    #             raise TypeError('options ('+repr(opts)+') is not a dictionary')
+    # def __getattr__(self, key):
+    #     return self[key]
+    # def __setattr__(self, key, value):
+    #     self[key] = value

@@ -1,18 +1,20 @@
+# standard library
 import os
 import os.path as osp
 import argparse
+import time
+from copy import deepcopy
+
+# third-party
 import yaml
 import torch
 import numpy as np
-import time
 import matplotlib.pyplot as plt
 import uncertainty_toolbox as uct
-from attrdict import AttrDict
 from tqdm import tqdm
-from copy import deepcopy
 
 from data.gp import *
-from utils.misc import load_module
+from utils.misc import load_module, AttrDict
 from utils.paths import results_path, evalsets_path
 from utils.log import get_logger, RunningAverage
 
@@ -108,7 +110,7 @@ def train(args, model):
             optimizer, T_max=args.num_steps)
 
     if args.resume:
-        ckpt = torch.load(os.path.join(args.root, 'ckpt.tar'))
+        ckpt = AttrDict.load_torch(os.path.join(args.root, 'ckpt.tar'))
         model.load_state_dict(ckpt.model)
         optimizer.load_state_dict(ckpt.optimizer)
         scheduler.load_state_dict(ckpt.scheduler)
@@ -166,7 +168,7 @@ def train(args, model):
             ckpt.scheduler = scheduler.state_dict()
             ckpt.logfilename = logfilename
             ckpt.step = step + 1
-            torch.save(ckpt, os.path.join(args.root, 'ckpt.tar'))
+            ckpt.save_torch(os.path.join(args.root, 'ckpt.tar'))
 
     args.mode = 'eval'
     eval(args, model)
@@ -209,7 +211,7 @@ def gen_evalset(args):
 def eval(args, model):
     # eval a trained model on log-likelihood
     if args.mode == 'eval':
-        ckpt = torch.load(os.path.join(args.root, 'ckpt.tar'), map_location='cuda')
+        ckpt = AttrDict.load_torch(os.path.join(args.root, 'ckpt.tar'), map_location='cuda')
         model.load_state_dict(ckpt.model)
         if args.eval_logfile is None:
             eval_logfile = f'eval_{args.eval_kernel}'
@@ -238,6 +240,8 @@ def eval(args, model):
     with torch.no_grad():
         for batch in tqdm(eval_batches, ascii=True):
             for key, val in batch.items():
+                print(type(val))
+                print(val.shape)
                 batch[key] = val.cuda()
             if args.model in ["np", "anp", "bnp", "banp"]:
                 outs = model(batch, args.eval_num_samples)
@@ -263,7 +267,7 @@ def eval(args, model):
 
 def eval_all_metrics(args, model):
     # eval a trained model on log-likelihood, rsme, calibration, and sharpness
-    ckpt = torch.load(os.path.join(args.root, 'ckpt.tar'), map_location='cuda')
+    ckpt = AttrDict.load_torch(os.path.join(args.root, 'ckpt.tar'), map_location='cuda')
     model.load_state_dict(ckpt.model)
     if args.eval_logfile is None:
         eval_logfile = f'eval_{args.eval_kernel}'
@@ -355,7 +359,7 @@ def plot(args, model):
     num_smp = args.plot_num_samples
 
     if args.mode == "plot":
-        ckpt = torch.load(os.path.join(args.root, 'ckpt.tar'), map_location='cuda')
+        ckpt = AttrDict.load_torch(os.path.join(args.root, 'ckpt.tar'), map_location='cuda')
         model.load_state_dict(ckpt.model)
     model = model.cuda()
 

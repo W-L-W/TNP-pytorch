@@ -1,5 +1,5 @@
 import torch
-from attrdict import AttrDict
+from utils.misc import AttrDict
 from torch.distributions import StudentT
 
 def img_to_task(img, num_ctx=None,

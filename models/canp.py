@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from attrdict import AttrDict
+from utils.misc import AttrDict
 
 from models.modules import CrossAttnEncoder, Decoder, PoolingEncoder
 

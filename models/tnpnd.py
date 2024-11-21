@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.distributions.normal import Normal
-from attrdict import AttrDict
+from utils.misc import AttrDict
 
 from models.modules import build_mlp
 from models.tnp import TNP

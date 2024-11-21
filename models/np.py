@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.distributions import kl_divergence
-from attrdict import AttrDict
+from utils.misc import AttrDict
 
 from utils.misc import stack, logmeanexp
 from utils.sampling import sample_subset

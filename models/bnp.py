@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from attrdict import AttrDict
+from utils.misc import AttrDict
 
 from models.cnp import CNP
 from utils.misc import stack, logmeanexp

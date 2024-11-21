@@ -6,7 +6,7 @@ import torch
 import numpy as np
 import time
 import uncertainty_toolbox as uct
-from attrdict import AttrDict
+from utils.misc import AttrDict
 from tqdm import tqdm
 from copy import deepcopy
 from PIL import Image

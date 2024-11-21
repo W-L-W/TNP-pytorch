@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.normal import Normal
-from attrdict import AttrDict
+from utils.misc import AttrDict
 
 from models.tnp import TNP
 

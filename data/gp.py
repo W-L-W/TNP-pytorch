@@ -1,6 +1,6 @@
 import torch
 from torch.distributions import MultivariateNormal, StudentT
-from attrdict import AttrDict
+from utils.misc import AttrDict
 import math
 
 
