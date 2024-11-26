@@ -54,7 +54,7 @@ class GPSampler(object):
         x_range=(-2, 2),
         device="cpu",
     ):
-
+        # see Batch class definition for more dimension convention information
         num_ctx = (
             num_ctx or torch.randint(low=3, high=max_num_points - 3, size=[1]).item()
         )  # Nc
@@ -67,27 +67,22 @@ class GPSampler(object):
         x = x_range[0] + (x_range[1] - x_range[0]) * torch.rand(
             [batch_size, num_points, 1], device=device
         )  # [B,N,Dx=1]
-        # batch.xc = batch.x[:, :num_ctx]  # [B,Nc,1]
-        # batch.xt = batch.x[:, num_ctx:]  # [B,Nt,1]
 
-        # batch_size * num_points * num_points
-        cov = self.kernel(batch.x)  # [B,N,N]
+        cov = self.kernel(x)  # [B,N,N]
         mean = torch.zeros(batch_size, num_points, device=device)  # [B,N]
         y = MultivariateNormal(mean, cov).rsample().unsqueeze(-1)  # [B,N,Dy=1]
-        # batch.yc = batch.y[:, :num_ctx]  # [B,Nc,1]
-        # batch.yt = batch.y[:, num_ctx:]  # [B,Nt,1]
 
-        batch = Batch(x=x, y=y, Nc=num_ctx)
-
+        # note in original code this occurs before splitting into context and target
+        # this is fine due to stateful computation, but for clarity we reorder
         if self.t_noise is not None:
             if self.t_noise == -1:
-                t_noise = 0.15 * torch.rand(batch.y.shape).to(device)  # [B,N,1]
+                t_noise = 0.15 * torch.rand(y.shape).to(device)  # [B,N,1]
             else:
                 t_noise = self.t_noise
-            batch.y += t_noise * StudentT(2.1).rsample(batch.y.shape).to(device)
+            y += t_noise * StudentT(2.1).rsample(y.shape).to(device)
+
+        batch = Batch.from_full_tensors(x=x, y=y, Nc=num_ctx)
         return batch
-        # {"x": [B,N,1], "xc": [B,Nc,1], "xt": [B,Nt,1],
-        #  "y": [B,N,1], "yc": [B,Nt,1], "yt": [B,Nt,1]}
 
 
 class RBFKernel(object):

@@ -110,7 +110,7 @@ class AttrDict:
             mmap=mmap,
             **pickle_load_args,
         )
-        return cls.__init__(**torch_dict)
+        return cls(**torch_dict)
 
 
 from collections import UserDict

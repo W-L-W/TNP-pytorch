@@ -267,8 +267,7 @@ def eval(args, model):
     model.eval()
     with torch.no_grad():
         for batch in tqdm(eval_batches, ascii=True):
-            for key, val in batch.items():
-                batch[key] = val.cuda()
+            batch.all_tensor_values_to_cuda()
             if args.model in ["np", "anp", "bnp", "banp"]:
                 outs = model(batch, args.eval_num_samples)
             else:
@@ -505,7 +504,7 @@ def plot(args, model):
     plt.tight_layout()
 
     save_dir_1 = osp.join(
-        args.root, f"plot_num{num_smp}-c{Nc}-t{Nt}-seed{seed}-{args.start_time}.jpg"
+        args.root, f"plot_num{num_smp}-c{Nc}-t{Nt}-seed{seed}-{args.start_time}.pdf"
     )
     file_name = "-".join(
         [
@@ -515,7 +514,7 @@ def plot(args, model):
             f"c{Nc}",
             f"t{Nt}",
             f"seed{seed}",
-            f"{args.start_time}.jpg",
+            f"{args.start_time}.pdf",
         ]
     )
     if args.expid is not None:
