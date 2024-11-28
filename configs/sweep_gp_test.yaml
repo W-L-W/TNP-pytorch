@@ -1,0 +1,58 @@
+name: "test_sweep_initial_gp_more_iter_lr_fix"
+function_name: "wandb_sweep"
+log_file_path: "results/from_config/RUN_NAME/logs.txt"
+time_stamp_name: True
+
+function_kwargs:
+  wandb_entity: "lennie"
+  wandb_project: "Prequential"
+  wandb_group: "sweep_tests"
+  function_to_call: "gp_main"
+
+  base_kwargs:
+    mode: "train"
+    expid: 'config_gp_test'
+    resume: False
+    model_name: "tnpa"
+
+    num_steps: 4000
+    print_freq: 1000
+    eval_freq: 10
+    save_freq: 2000
+
+    model_kwargs:
+      dim_x: 1
+      dim_y: 1
+      d_model: 64
+      emb_depth: 4
+      dim_feedforward: 128
+      nhead: 4
+      dropout: 0.0
+      num_layers: 6
+      permute: True
+
+  sweep_configuration:
+    name: "RUN_NAME"
+    method: "bayes"
+    metric:
+      name: "loss"
+      goal: "minimize"
+
+    parameters:
+      lr:
+        # log uniform distribution from 1e-6 to 1e-3
+        values: [0.00005, 0.0005, 0.005]
+
+      train_batch_size:
+        values: [64, 128, 256]
+
+    early_terminate:
+      type: hyperband
+      s: 2
+      eta: 3
+      min_iter: 5
+      strict: True
+
+
+
+

@@ -1,0 +1,31 @@
+name: "test_config_initial_gp"
+function_name: "gp_main"
+log_file_path: "results/from_config/RUN_NAME/logs.txt"
+time_stamp_name: True
+wandb_entity: "lennie"
+wandb_project: "Prequential"
+
+function_kwargs:
+  mode: "plot"
+  expid: 'config_gp_test'
+  resume: False
+  model_name: "tnpa"
+
+  train_batch_size: 256
+
+  num_steps: 40000
+  print_freq: 1000
+  eval_freq: 500
+  save_freq: 2000
+
+  model_kwargs:
+    dim_x: 1
+    dim_y: 1
+    d_model: 64
+    emb_depth: 4
+    dim_feedforward: 128
+    nhead: 4
+    dropout: 0.0
+    num_layers: 6
+    permute: True
+

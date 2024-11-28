@@ -1,8 +1,16 @@
 import os
-from typing import Any, Dict
+from typing import Any, Dict, NewType
 from importlib.machinery import SourceFileLoader
 import math
 import torch
+
+StrKeyDict = NewType("StrKeyDict", Dict[str, Any])
+NestedTensorDict = NewType("NestedTensorDict", StrKeyDict)
+# convention: this is a dictionary whose keys are all strings
+# and values are either Tensors or NestedTensorDicts
+# (but that is hard to type hint)
+
+CNP = NewType("CNP", torch.nn.Module)
 
 
 def gen_load_func(parser, func):
@@ -45,14 +53,6 @@ def hrminsec(duration):
 ########
 # Lennie
 ########
-
-StrKeyDict = Dict[str, Any]
-NestedTensorDict = StrKeyDict
-# convention: this is a dictionary whose keys are all strings
-# and values are either Tensors or NestedTensorDicts
-# (but that is hard to type hint)
-
-
 def move_nested_tensor_values_to_cuda(d: NestedTensorDict):
     """Move all tensor leaves to cuda in place."""
     for k, v in d.items():

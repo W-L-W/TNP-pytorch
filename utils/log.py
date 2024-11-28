@@ -69,6 +69,10 @@ class RunningAverage(object):
             line += f"({time.time()-self.clock:.3f} secs)"
         return line
 
+    # Lennie extensions
+    def mean_dict(self):
+        return {key: self.get(key) for key in self.keys()}
+
 
 def get_log(fileroot):
     step = []

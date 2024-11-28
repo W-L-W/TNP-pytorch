@@ -1,107 +1,100 @@
+"""Minimal refactoring of TNP repo code to be compatible with research scaffold"""
+
 # standard library
 import os
 import os.path as osp
 import argparse
 import time
 from copy import deepcopy
+from typing import Literal
 
 # third-party
+import wandb
 import yaml
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import uncertainty_toolbox as uct
 from tqdm import tqdm
-
+from dataclasses import dataclass
 from data.gp import *
-from utils.misc import load_module, AttrDict, navigate_to_tnp_code_dir, StrKeyDict
+from utils.misc import load_module, AttrDict, navigate_to_tnp_code_dir, StrKeyDict, CNP
 from utils.paths import results_path, evalsets_path
 from utils.log import get_logger, RunningAverage
 
 
-def main():
-    navigate_to_tnp_code_dir()
-    parser = argparse.ArgumentParser()
+@dataclass
+class GPExperimentArguments:
+    """Adapt from original gp.py argument parsing code"""
 
-    # Experiment
-    parser.add_argument(
-        "--mode", default="train", choices=["train", "eval", "eval_all_metrics", "plot"]
-    )
-    parser.add_argument("--expid", type=str, default="default")
-    parser.add_argument("--resume", type=str, default=None)
+    mode: Literal["train", "eval", "plot"]
+    expid: str
+    resume: bool = False
 
     # Data
-    parser.add_argument("--max_num_points", type=int, default=50)
+    max_num_points: int = 50
 
     # Model
-    parser.add_argument("--model", type=str, default="tnpd")
+    model_name: str = "tnpa"
+    model_kwargs: StrKeyDict = None
 
     # Train
-    parser.add_argument("--train_seed", type=int, default=0)
-    parser.add_argument("--train_batch_size", type=int, default=16)
-    parser.add_argument("--train_num_samples", type=int, default=4)
-    parser.add_argument("--train_num_bs", type=int, default=10)
-    parser.add_argument("--lr", type=float, default=5e-4)
-    parser.add_argument("--num_steps", type=int, default=100000)
-    parser.add_argument("--print_freq", type=int, default=200)
-    parser.add_argument("--eval_freq", type=int, default=5000)
-    parser.add_argument("--save_freq", type=int, default=1000)
+    train_seed: int = 0
+    train_batch_size: int = 16
+    train_num_samples: int = 4
+    train_num_bs: int = 10
+    lr: float = 5e-4
+    num_steps: int = 100000
+    print_freq: int = 200
+    eval_freq: int = 5000
+    save_freq: int = 1000
 
     # Eval
-    parser.add_argument("--eval_seed", type=int, default=0)
-    parser.add_argument("--eval_num_batches", type=int, default=3000)
-    parser.add_argument("--eval_batch_size", type=int, default=16)
-    parser.add_argument("--eval_num_samples", type=int, default=50)
-    parser.add_argument("--eval_logfile", type=str, default=None)
+    eval_seed: int = 0
+    eval_num_batches: int = 3000
+    eval_batch_size: int = 16
+    eval_num_samples: int = 50
+    eval_logfile: str = None
 
     # Plot
-    parser.add_argument("--plot_seed", type=int, default=0)
-    parser.add_argument("--plot_batch_size", type=int, default=16)
-    parser.add_argument("--plot_num_samples", type=int, default=30)
-    parser.add_argument("--plot_num_ctx", type=int, default=30)
-    parser.add_argument("--plot_num_tar", type=int, default=10)
-    parser.add_argument("--start_time", type=str, default=None)
+    plot_seed: int = 0
+    plot_batch_size: int = 16
+    plot_num_samples: int = 30
+    plot_num_ctx: int = 30
+    plot_num_tar: int = 10
+    start_time: str = None
 
     # OOD settings
-    parser.add_argument("--eval_kernel", type=str, default="rbf")
-    parser.add_argument("--t_noise", type=float, default=None)
+    eval_kernel: str = "rbf"
+    t_noise: float = None
 
-    args = parser.parse_args()
+    @property
+    def root(self) -> str:
+        return osp.join(results_path, "gp", self.model_name, self.expid)
 
-    if args.expid is not None:
-        args.root = osp.join(results_path, "gp", args.model, args.expid)
-    else:
-        args.root = osp.join(results_path, "gp", args.model)
+    def construct_model(self) -> CNP:
+        model_cls = getattr(
+            load_module(f"models/{self.model_name}.py"), self.model_name.upper()
+        )
+        return model_cls(**self.model_kwargs)
 
-    model_cls = getattr(load_module(f"models/{args.model}.py"), args.model.upper())
-    with open(f"configs/gp/{args.model}.yaml", "r") as f:
-        config = yaml.safe_load(f)
 
-    if args.model in [
-        "np",
-        "anp",
-        "cnp",
-        "canp",
-        "bnp",
-        "banp",
-        "tnpd",
-        "tnpa",
-        "tnpnd",
-    ]:
-        model = model_cls(**config)
+def gp_main(**exp_kwargs):
+    args = GPExperimentArguments(**exp_kwargs)
+    model = args.construct_model()
     model.cuda()
 
     if args.mode == "train":
-        train(args, model)
+        train(model, args)
     elif args.mode == "eval":
-        eval(args, model)
-    elif args.mode == "eval_all_metrics":
-        eval_all_metrics(args, model)
+        eval(model, args, step=0)
     elif args.mode == "plot":
-        plot(args, model)
+        plot(model, args)
+    else:
+        raise ValueError(f"Invalid mode: {args.mode}")
 
 
-def train(args, model):
+def train(model: CNP, args: GPExperimentArguments):
     if osp.exists(args.root + "/ckpt.tar"):
         if args.resume is None:
             raise FileExistsError(args.root)
@@ -142,7 +135,7 @@ def train(args, model):
     ravg = RunningAverage()
 
     if not args.resume:
-        logger.info(f"Experiment: {args.model}-{args.expid}")
+        logger.info(f"Experiment: {args.model_name}-{args.expid}")
         logger.info(
             f"Total number of parameters: {sum(p.numel() for p in model.parameters())}\n"
         )
@@ -156,7 +149,7 @@ def train(args, model):
             device="cuda",
         )
 
-        if args.model in ["np", "anp", "cnp", "canp", "bnp", "banp"]:
+        if args.model_name in ["np", "anp", "cnp", "canp", "bnp", "banp"]:
             outs = model(batch, num_samples=args.train_num_samples)
         else:
             outs = model(batch)
@@ -165,18 +158,20 @@ def train(args, model):
         optimizer.step()
         scheduler.step()
 
+        wandb.log({"train_loss": outs.loss.item()}, step=step)
+
         for key, val in outs.items():
             ravg.update(key, val)
 
         if step % args.print_freq == 0:
-            line = f"{args.model}:{args.expid} step {step} "
+            line = f"{args.model_name}:{args.expid} step {step} "
             line += f'lr {optimizer.param_groups[0]["lr"]:.3e} '
             line += f"[train_loss] "
             line += ravg.info()
             logger.info(line)
 
             if step % args.eval_freq == 0:
-                line = eval(args, model)
+                line = eval(model, args, step=step)
                 logger.info(line + "\n")
 
             ravg.reset()
@@ -191,7 +186,7 @@ def train(args, model):
             ckpt.save_torch(os.path.join(args.root, "ckpt.tar"))
 
     args.mode = "eval"
-    eval(args, model)
+    eval(model, args, step=step)
 
 
 def get_eval_path(args):
@@ -234,7 +229,7 @@ def gen_evalset(args):
     torch.save(batches, osp.join(path, filename))
 
 
-def eval(args, model):
+def eval(model: CNP, args: GPExperimentArguments, *, step: int):
     # eval a trained model on log-likelihood
     if args.mode == "eval":
         ckpt = AttrDict.load_torch(
@@ -268,7 +263,7 @@ def eval(args, model):
     with torch.no_grad():
         for batch in tqdm(eval_batches, ascii=True):
             batch.all_tensor_values_to_cuda()
-            if args.model in ["np", "anp", "bnp", "banp"]:
+            if args.model_name in ["np", "anp", "bnp", "banp"]:
                 outs = model(batch, args.eval_num_samples)
             else:
                 outs = model(batch)
@@ -279,13 +274,16 @@ def eval(args, model):
     torch.manual_seed(time.time())
     torch.cuda.manual_seed(time.time())
 
-    line = f"{args.model}:{args.expid} {args.eval_kernel} "
+    line = f"{args.model_name}:{args.expid} {args.eval_kernel} "
     if args.t_noise is not None:
         line += f"tn {args.t_noise} "
     line += ravg.info()
 
     if logger is not None:
         logger.info(line)
+
+    # Lennie: log to wandb!
+    wandb.log(ravg.mean_dict(), step=step)
 
     return line
 
@@ -321,12 +319,12 @@ def eval_all_metrics(args, model):
         for batch in tqdm(eval_batches, ascii=True):
             for key, val in batch.items():
                 batch[key] = val.cuda()
-            if args.model in ["np", "anp", "cnp", "canp", "bnp", "banp"]:
+            if args.model_name in ["np", "anp", "cnp", "canp", "bnp", "banp"]:
                 outs = model.predict(
                     batch.xc, batch.yc, batch.xt, num_samples=args.eval_num_samples
                 )
                 ll = model(batch, num_samples=args.eval_num_samples)
-            elif args.model in ["tnpa", "tnpnd"]:
+            elif args.model_name in ["tnpa", "tnpnd"]:
                 outs = model.predict(
                     batch.xc, batch.yc, batch.xt, num_samples=args.eval_num_samples
                 )
@@ -373,7 +371,7 @@ def eval_all_metrics(args, model):
     torch.manual_seed(time.time())
     torch.cuda.manual_seed(time.time())
 
-    line = f"{args.model}:{args.expid} {args.eval_kernel} "
+    line = f"{args.model_name}:{args.expid} {args.eval_kernel} "
     if args.t_noise is not None:
         line += f"tn {args.t_noise} "
 
@@ -389,7 +387,7 @@ def eval_all_metrics(args, model):
     return line
 
 
-def plot(args, model):
+def plot(model: CNP, args: GPExperimentArguments):
     seed = args.plot_seed
     num_smp = args.plot_num_samples
 
@@ -422,16 +420,16 @@ def plot(args, model):
 
     model.eval()
     with torch.no_grad():
-        if args.model in ["np", "anp", "bnp", "banp"]:
+        if args.model_name in ["np", "anp", "bnp", "banp"]:
             outs = model(batch, num_smp, reduce_ll=False)
         else:
             outs = model(batch, reduce_ll=False)
         tar_loss = outs.tar_ll  # [Ns,B,Nt] ([B,Nt] for CNP)
-        if args.model in ["cnp", "canp", "tnpd", "tnpa", "tnpnd"]:
+        if args.model_name in ["cnp", "canp", "tnpd", "tnpa", "tnpnd"]:
             tar_loss = tar_loss.unsqueeze(0)  # [1,B,Nt]
 
         xt = xp[None, :, None].repeat(args.plot_batch_size, 1, 1)
-        if args.model in ["np", "anp", "bnp", "banp", "tnpa", "tnpnd"]:
+        if args.model_name in ["np", "anp", "bnp", "banp", "tnpa", "tnpnd"]:
             pred = model.predict(batch.xc, batch.yc, xt, num_samples=num_smp)
         else:
             pred = model.predict(batch.xc, batch.yc, xt)
@@ -508,7 +506,7 @@ def plot(args, model):
     )
     file_name = "-".join(
         [
-            args.model,
+            args.model_name,
             args.expid,
             f"plot_num{num_smp}",
             f"c{Nc}",
@@ -532,4 +530,4 @@ def plot(args, model):
 
 
 if __name__ == "__main__":
-    main()
+    gp_main()
