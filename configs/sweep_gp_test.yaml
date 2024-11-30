@@ -1,4 +1,4 @@
-name: "test_sweep_initial_gp_more_iter_lr_fix"
+name: "test_sweep_initial_gp_more_iter_lr_grid"
 function_name: "wandb_sweep"
 log_file_path: "results/from_config/RUN_NAME/logs.txt"
 time_stamp_name: True
@@ -19,6 +19,7 @@ function_kwargs:
     print_freq: 1000
     eval_freq: 10
     save_freq: 2000
+    train_batch_size: 128
 
     model_kwargs:
       dim_x: 1
@@ -33,25 +34,21 @@ function_kwargs:
 
   sweep_configuration:
     name: "RUN_NAME"
-    method: "bayes"
+    method: "grid"
     metric:
       name: "loss"
       goal: "minimize"
 
     parameters:
       lr:
-        # log uniform distribution from 1e-6 to 1e-3
-        values: [0.00005, 0.0005, 0.005]
+        values: [0.0001, 0.00005, 0.0001, 0.0005, 0.005]
 
-      train_batch_size:
-        values: [64, 128, 256]
-
-    early_terminate:
-      type: hyperband
-      s: 2
-      eta: 3
-      min_iter: 5
-      strict: True
+    # early_terminate:
+    #   type: hyperband
+    #   s: 2
+    #   eta: 3
+    #   min_iter: 5
+    #   strict: True
 
 
 

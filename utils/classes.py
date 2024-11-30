@@ -26,27 +26,29 @@ class Batch(AttrDict):
     Note have identity $N = Nc + Nt$
     """
 
-    x: Float[Tensor, "B N Dx"]
-    y: Float[Tensor, "B N Dy"]
+    x: Float[Tensor, "*B N Dx"]
+    y: Float[Tensor, "*B N Dy"]
     Nc: int
 
-    xc: Float[Tensor, "B Nc Dx"]
-    yc: Float[Tensor, "B Nc Dy"]
-    xt: Float[Tensor, "B Nt Dx"]
-    yt: Float[Tensor, "B Nt Dy"]
+    xc: Float[Tensor, "*B Nc Dx"]
+    yc: Float[Tensor, "*B Nc Dy"]
+    xt: Float[Tensor, "*B Nt Dx"]
+    yt: Float[Tensor, "*B Nt Dy"]
 
     @classmethod
     def from_full_tensors(
-        cls, x: Float[Tensor, "B N Dx"], y: Float[Tensor, "B N Dy"], Nc: int
+        cls, x: Float[Tensor, "*B N Dx"], y: Float[Tensor, "*B N Dy"], Nc: int
     ):
+        # when asked GPT about making compatible with multiple leading batch directions they would only suggest reshaping
+        # think ... should work OK
         return cls(
             x=x,
             y=y,
             Nc=Nc,
-            xc=x[:, :Nc, :],
-            yc=y[:, :Nc, :],
-            xt=x[:, Nc:, :],
-            yt=y[:, Nc:, :],
+            xc=x[..., :Nc, :],
+            yc=y[..., :Nc, :],
+            xt=x[..., Nc:, :],
+            yt=y[..., Nc:, :],
         )
 
     def all_tensor_values_to_cuda(self):
@@ -75,4 +77,4 @@ class NPOutputs:
     (flexible for different NP variants)
     """
 
-    tar_ll: Float[Tensor, "B"]
+    tar_ll: Float[Tensor, "*B"]

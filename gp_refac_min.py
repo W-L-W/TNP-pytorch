@@ -7,6 +7,7 @@ import argparse
 import time
 from copy import deepcopy
 from typing import Literal
+from dataclasses import dataclass
 
 # third-party
 import wandb
@@ -16,11 +17,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import uncertainty_toolbox as uct
 from tqdm import tqdm
-from dataclasses import dataclass
+
+# project
 from data.gp import *
 from utils.misc import load_module, AttrDict, navigate_to_tnp_code_dir, StrKeyDict, CNP
 from utils.paths import results_path, evalsets_path
 from utils.log import get_logger, RunningAverage
+from utils.classes import Batch
+from models.tnpa import TNPA
 
 
 @dataclass
@@ -63,6 +67,7 @@ class GPExperimentArguments:
     plot_num_ctx: int = 30
     plot_num_tar: int = 10
     start_time: str = None
+    plot_mode: Literal["original", "lennie"] = "original"
 
     # OOD settings
     eval_kernel: str = "rbf"
@@ -387,7 +392,61 @@ def eval_all_metrics(args, model):
     return line
 
 
+def flexible_predict(model: TNPA, xc, yc, xt, xp, num_samples=10):
+    """Make AR predictions on the targets xt then roll out (parallel) input-wise predictions on
+    the grid xp (of x-Plotting locations)"""
+    from utils.misc import stack
+
+    # TODO: debug this code!
+
+    # lifting helper functions from tnpa.py
+    batch_size = xc.shape[0]
+    num_target = xt.shape[1]
+
+    def squeeze(x):
+        return x.view(-1, x.shape[-2], x.shape[-1])
+
+    def unsqueeze(x):
+        return x.view(num_samples, batch_size, x.shape[-2], x.shape[-1])
+
+    # first make AR predictions with return sample mode
+    # only implemented for tnpa for now
+    yt_samples = model.predict(xc, yc, xt, num_samples=num_samples, return_samples=True)
+    # dimension (num_samples, batch_size, num_target, dim_y)
+    # then update batches to use this information
+    # get xc2 by combining xc and xt then stacking by number of samples
+    xc2 = stack(torch.cat((xc, xt), dim=-2), num_samples)
+    # get yc2 by stacking yc by number of samples
+    yc2 = torch.cat(stack(yc, num_samples), yt_samples, dim=-2)
+    # plot points are simply stacked versions of earlier points
+    xt2 = stack(xt, num_samples)
+    xp2 = stack(xp, num_samples)
+    yt2 = torch.zeros((batch_size, num_target, yc.shape[2]), device="cuda")
+    # now get predictions in parallel
+    batch_stacked = AttrDict()
+    batch_stacked.xc = squeeze(xc2)
+    batch_stacked.yc = squeeze(yc2)
+    batch_stacked.xt = squeeze(xt2)
+    batch_stacked.yt = squeeze(yt2)
+
+    z_target_stacked = model.encode(batch_stacked, autoreg=True)
+    out = model.predictor(z_target_stacked)
+    mean, std = torch.chunk(out, 2, dim=-1)
+    std = torch.exp(std)
+    mean, std = unsqueeze(mean), unsqueeze(std)
+
+    # how best to move forward? probably have to use the squeeze unsqueeze trick as it seems that
+    # the model won't work in batched mode out of the box
+    return mean, std
+
+
+# extra thoughts:
+# - nice to implement Batch creation from xc, yc, xt, yt (not full tensors necessarily)
+#
+
+
 def plot(model: CNP, args: GPExperimentArguments):
+    """Currently this generates autoregressively on the full plot-design-grid."""
     seed = args.plot_seed
     num_smp = args.plot_num_samples
 
@@ -428,11 +487,16 @@ def plot(model: CNP, args: GPExperimentArguments):
         if args.model_name in ["cnp", "canp", "tnpd", "tnpa", "tnpnd"]:
             tar_loss = tar_loss.unsqueeze(0)  # [1,B,Nt]
 
-        xt = xp[None, :, None].repeat(args.plot_batch_size, 1, 1)
-        if args.model_name in ["np", "anp", "bnp", "banp", "tnpa", "tnpnd"]:
-            pred = model.predict(batch.xc, batch.yc, xt, num_samples=num_smp)
-        else:
-            pred = model.predict(batch.xc, batch.yc, xt)
+        if args.plot_mode == "original":
+            xt = xp[None, :, None].repeat(args.plot_batch_size, 1, 1)
+            if args.model_name in ["np", "anp", "bnp", "banp", "tnpa", "tnpnd"]:
+                pred = model.predict(batch.xc, batch.yc, xt, num_samples=num_smp)
+            else:
+                pred = model.predict(batch.xc, batch.yc, xt)
+
+        elif args.plot_mode == "lennie":
+            # sample AR over the target points, then return input-wise predictions on grid
+            pass  # TODO fit in flexible_predict(model, batch.xc, batch.yc, batch.xt, xp, num_smp)
 
         mu, sigma = pred.mean, pred.scale
 

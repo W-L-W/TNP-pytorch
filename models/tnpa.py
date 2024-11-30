@@ -142,6 +142,7 @@ class TNPA(TNP):
             )
 
         if return_samples:
+            # dimension (num_samples, batch_size, num_target, dim_y)
             return unsqueeze(batch_stacked.yt)
 
         return Normal(mean, std)
